@@ -9,8 +9,13 @@ com : IDENTIFIER "=" exp ";"     -> assignation
 | "if" "(" exp ")" "{" bcom "}"  -> if
 | "while" "(" exp ")" "{" bcom "}"  -> while
 | "print" "(" exp ")"               -> print
+| lhs "=" exp ";"                   -> attribut
 bcom : (com)*
 prg : "main" "(" var_list ")" "{" bcom "return" "(" exp ")" ";"  "}"
+class : "class" " " IDENTIFIER "{" constructor "}"
+constructor : IDENTIFIER "(" var_list ")" "{" bcom "}"
+lhs : IDENTIFIER                -> assignation  
+| IDENTIFIER "." IDENTIFIER     -> self
 var_list :                       -> vide
 | IDENTIFIER (","  IDENTIFIER)*  -> aumoinsune
 IDENTIFIER : /[a-zA-Z][a-zA-Z0-9]*/
@@ -18,7 +23,7 @@ OPBIN : /[+\-*>]/
 %import common.WS
 %import common.SIGNED_NUMBER
 %ignore WS
-""",start="prg")
+""",start="class")
 
 op = {'+' : 'add', '-' : 'sub'}
 
@@ -116,6 +121,9 @@ def pp_com(c):
         return f"while ({pp_exp(c.children[0])}) {{{x}}}"
     elif c.data == "print":
         return f"print({pp_exp(c.children[0])})"
+    elif c.data == "attribut":
+        return f"{pp_attribut(c.children[0])} = {pp_exp(c.children[1])};"
+
 
 
 def vars_com(c):
@@ -179,17 +187,54 @@ def pp_prg(p):
     R = pp_exp(p.children[2])
     return "main( %s ) { %s return(%s);\n}" % (L, C, R)
 
+def pp_constructor(cons):
+    #print(cons.children[0])
+    I = cons.children[0]
+    L = pp_var_list(cons.children[1])
+    C = pp_bcom(cons.children[2])
+    #print(C)
+    return "%s ( %s ) { %s \n}" % (I, L, C)
 
-ast = grammaire.parse("""main(x,y){
-        while(x){
-            x = x - 1;
-            y = y + 1;
-        }
-    return (y);
+def pp_attribut(a):
+    if a.data == "assignation":
+        return f"{a.children[0].value}"
+    elif a.data == "self":
+        return f"{a.children[0].value}.{a.children[1].value}"
+
+def pp_class(c):
+    I = c.children[0]
+    CONS = pp_constructor(c.children[1])
+    return "class %s{ %s \n}" % (I, CONS)
+
+#ast = grammaire.parse("""main(x,y){
+        #while(x){
+           # x = x - 1;
+           # y = y + 1;
+        #}
+    #return (y);
+#}
+#""")
+#asm = asm_prg(ast)
+#f = open("ouf.asm", "w")
+#f.write(asm)
+#f.close()
+
+
+ast_class = grammaire.parse("""class A {
+    A(x,y,z){
+       self.x = x;
+        y = 1;
+        z = 2;
+    }
 }
 """)
-asm = asm_prg(ast)
-f = open("ouf.asm", "w")
-f.write(asm)
-f.close()
 
+
+#ast_constructor = grammaire.parse("""
+#A(x){
+        #self.x = x;
+        #x = y;
+   # }
+#""")
+print(pp_class(ast_class))
+#print(pp_constructor(ast_constructor))
