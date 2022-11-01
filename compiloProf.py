@@ -5,6 +5,7 @@ exp : SIGNED_NUMBER              -> exp_nombre
 | IDENTIFIER                     -> exp_var
 | exp OPBIN exp                  -> exp_opbin
 | "(" exp ")"                    -> exp_par
+|   "\"" STRING "\""           -> exp_str
 com : IDENTIFIER "=" exp ";"     -> assignation
 | "if" "(" exp ")" "{" bcom "}"  -> if
 | "while" "(" exp ")" "{" bcom "}"  -> while
@@ -18,14 +19,18 @@ lhs : IDENTIFIER                -> assignation
 | IDENTIFIER "." IDENTIFIER     -> self
 var_list :                       -> vide
 | IDENTIFIER (","  IDENTIFIER)*  -> aumoinsune
+fonction : "len" "(" IDENTIFIER ")"  ->length
 IDENTIFIER : /[a-zA-Z][a-zA-Z0-9]*/
 OPBIN : /[+\-*>]/
+STRING : /[a-zA-Z][a-zA-Z0-9.,!?]*/
 %import common.WS
 %import common.SIGNED_NUMBER
 %ignore WS
-""",start="class")
+""",start="prg")
 
 op = {'+' : 'add', '-' : 'sub'}
+
+list_str = []
 
 def asm_exp(e):
     if e.data == "exp_nombre":
@@ -34,7 +39,7 @@ def asm_exp(e):
         return f"mov rax, [{e.children[0].value}]\n"
     elif e.data == "exp_par":
         return asm_exp(e.children[0])
-    else:
+    elif e.data == "exp_opbin":
         E1 = asm_exp(e.children[0])
         E2 = asm_exp(e.children[2])
         return f"""
@@ -44,26 +49,38 @@ def asm_exp(e):
         pop rbx
         {op[e.children[1].value]} rax, rbx
         """
+    elif e.data == "exp_str":
+
+        return f"mov rax, str{list_str.index(e.children[0].value)} \0\n"
 
 def pp_exp(e):
     if e.data in {"exp_nombre", "exp_var"}:
         return e.children[0].value
     elif e.data == "exp_par":
         return f"({pp_exp(e.children[0])})"
-    else:
+    elif e.data == "exp_opbin":
         return f"{pp_exp(e.children[0])} {e.children[1].value} {pp_exp(e.children[2])}"
+    elif e.data == "exp_str":
+        return f"{e.children[0].value}"
+
 
 def vars_exp(e):
-    if e.data  == "exp_nombre":
+    if e.data  == "exp_nombre" :
         return set()
     elif e.data ==  "exp_var":
         return { e.children[0].value }
     elif e.data == "exp_par":
         return vars_exp(e.children[0])
-    else:
+    elif e.data == "exp_opbin":
         L = vars_exp(e.children[0])
         R = vars_exp(e.children[2])
+        #print(type(e.children[2].value))
         return L | R
+    elif e.data == "exp_str":
+        #print(e.children[0].value)
+       # return { e.children[0].value }
+       list_str.append(e.children[0].value)
+       return set()
 
 cpt = 0
 def next():
@@ -74,6 +91,7 @@ def next():
 def asm_com(c):
     if c.data == "assignation":
         E = asm_exp(c.children[1])
+        #print(E)
         return f"""
         {E}
         mov [{c.children[0].value}], rax        
@@ -129,6 +147,8 @@ def pp_com(c):
 def vars_com(c):
     if c.data == "assignation":
         R = vars_exp(c.children[1])
+        #print(R)
+        #print(c.children[1])
         return {c.children[0].value} | R
     elif c.data in {"if", "while"}:
         B = vars_bcom(c.children[1])
@@ -155,12 +175,13 @@ def pp_var_list(vl):
 def asm_prg(p):
     f = open("moule.asm")
     moule = f.read()
+    D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
+    D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str])
+    moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[1])
     moule = moule.replace("BODY", C)
     E = asm_exp(p.children[2])
     moule = moule.replace("RETURN", E)
-    D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
-    moule = moule.replace("DECL_VARS", D)
     s = ""
     for i in range(len(p.children[0].children)):
         v = p.children[0].children[i].value
@@ -179,6 +200,8 @@ def vars_prg(p):
     L = set([t.value for t in p.children[0].children])
     C = vars_bcom(p.children[1])
     R = vars_exp(p.children[2])
+    print(p.children[1])
+    #print(C)
     return L | C | R
 
 def pp_prg(p):
@@ -220,14 +243,14 @@ def pp_class(c):
 #f.close()
 
 
-ast_class = grammaire.parse("""class A {
-    A(x,y,z){
-       self.x = x;
-        y = 1;
-        z = 2;
-    }
-}
-""")
+#ast_class = grammaire.parse("""class A {
+    #A(x,y,z){
+       #self.x = x;
+        #y = 1;
+        #z = 2;
+    #}
+#}
+#""")
 
 
 #ast_constructor = grammaire.parse("""
@@ -236,5 +259,17 @@ ast_class = grammaire.parse("""class A {
         #x = y;
    # }
 #""")
-print(pp_class(ast_class))
+#print(pp_class(ast_class))
 #print(pp_constructor(ast_constructor))
+
+ast_string1=grammaire.parse(""" main(x){
+ x = "coucou,hello.aaaaaa";
+ return (x);}
+ 
+ """)
+asm_string1 = asm_prg(ast_string1)
+#print(pp_prg(ast_string1))
+#print(asm_prg(ast_string1))
+f = open("ouf_string1.asm", "w")
+f.write(asm_string1)
+f.close()
