@@ -6,6 +6,9 @@ exp : SIGNED_NUMBER              -> exp_nombre
 | exp OPBIN exp                  -> exp_opbin
 | "(" exp ")"                    -> exp_par
 |   "\"" STRING "\""           -> exp_str
+| "len" "(" IDENTIFIER ")"     -> exp_fonc_length
+| STRING "+" STRING             -> exp_fonc_concatenation
+| IDENTIFIER "[" SIGNED_NUMBER "]" -> exp_fonc_getletter
 com : IDENTIFIER "=" exp ";"     -> assignation
 | "if" "(" exp ")" "{" bcom "}"  -> if
 | "while" "(" exp ")" "{" bcom "}"  -> while
@@ -19,7 +22,6 @@ lhs : IDENTIFIER                -> assignation
 | IDENTIFIER "." IDENTIFIER     -> self
 var_list :                       -> vide
 | IDENTIFIER (","  IDENTIFIER)*  -> aumoinsune
-fonction : "len" "(" IDENTIFIER ")"  ->length
 IDENTIFIER : /[a-zA-Z][a-zA-Z0-9]*/
 OPBIN : /[+\-*>]/
 STRING : /[a-zA-Z][a-zA-Z0-9.,!?]*/
@@ -31,6 +33,8 @@ STRING : /[a-zA-Z][a-zA-Z0-9.,!?]*/
 op = {'+' : 'add', '-' : 'sub'}
 
 list_str = []
+list_len = []
+list_sum = []
 
 def asm_exp(e):
     if e.data == "exp_nombre":
@@ -40,18 +44,28 @@ def asm_exp(e):
     elif e.data == "exp_par":
         return asm_exp(e.children[0])
     elif e.data == "exp_opbin":
-        E1 = asm_exp(e.children[0])
-        E2 = asm_exp(e.children[2])
-        return f"""
-        {E2}
-        push rax
-        {E1}
-        pop rbx
-        {op[e.children[1].value]} rax, rbx
-        """
+
+        if (e.children[0].data == "exp_str"):
+            children = e.children[0].children[0] + e.children[2].children[0]
+            return f"mov rax, sum{list_sum.index(children)} \0\n"
+        else:
+            E1 = asm_exp(e.children[0])
+            E2 = asm_exp(e.children[2])
+            return f"""
+            {E2}
+            push rax
+            {E1}
+            pop rbx
+            {op[e.children[1].value]} rax, rbx
+            """
     elif e.data == "exp_str":
 
         return f"mov rax, str{list_str.index(e.children[0].value)} \0\n"
+    elif e.data == "exp_fonc_length":
+        
+        return f"mov rax, len{list_len.index(e.children[0].value)} \0\n "
+    
+
 
 def pp_exp(e):
     if e.data in {"exp_nombre", "exp_var"}:
@@ -59,9 +73,16 @@ def pp_exp(e):
     elif e.data == "exp_par":
         return f"({pp_exp(e.children[0])})"
     elif e.data == "exp_opbin":
+        
         return f"{pp_exp(e.children[0])} {e.children[1].value} {pp_exp(e.children[2])}"
     elif e.data == "exp_str":
         return f"{e.children[0].value}"
+    elif e.data == "exp_fonc_length":
+        return f"len({e.children[0].value})"
+    elif e.data == "exp_fonc_concatenation":
+        return f"{e.children[0].value}+{e.children[1].value}"
+    elif e.data == "exp_fonc_getletter":
+        return f"{e.children[0].value}[{e.children[1].value}]"
 
 
 def vars_exp(e):
@@ -72,15 +93,22 @@ def vars_exp(e):
     elif e.data == "exp_par":
         return vars_exp(e.children[0])
     elif e.data == "exp_opbin":
-        L = vars_exp(e.children[0])
-        R = vars_exp(e.children[2])
-        #print(type(e.children[2].value))
-        return L | R
+        if (e.children[0].data == "exp_str"):
+            children = e.children[0].children[0] + e.children[2].children[0]
+            list_sum.append(children)
+            return set()
+        else:
+            L = vars_exp(e.children[0])
+            R = vars_exp(e.children[2])
+            return L | R
     elif e.data == "exp_str":
-        #print(e.children[0].value)
-       # return { e.children[0].value }
        list_str.append(e.children[0].value)
        return set()
+    elif e.data == "exp_fonc_length":
+        #print(list_len)
+        list_len.append(e.children[0].value)
+        return set()
+    
 
 cpt = 0
 def next():
@@ -91,7 +119,6 @@ def next():
 def asm_com(c):
     if c.data == "assignation":
         E = asm_exp(c.children[1])
-        #print(E)
         return f"""
         {E}
         mov [{c.children[0].value}], rax        
@@ -147,8 +174,6 @@ def pp_com(c):
 def vars_com(c):
     if c.data == "assignation":
         R = vars_exp(c.children[1])
-        #print(R)
-        #print(c.children[1])
         return {c.children[0].value} | R
     elif c.data in {"if", "while"}:
         B = vars_bcom(c.children[1])
@@ -176,7 +201,9 @@ def asm_prg(p):
     f = open("moule.asm")
     moule = f.read()
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
-    D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str])
+    D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
+    D += "\n"+"\n".join([f"len{list_str.index(v)} : dq {len(v)}, 0" for v in list_str]) # declaire adress for length string
+    D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[1])
     moule = moule.replace("BODY", C)
@@ -200,8 +227,6 @@ def vars_prg(p):
     L = set([t.value for t in p.children[0].children])
     C = vars_bcom(p.children[1])
     R = vars_exp(p.children[2])
-    print(p.children[1])
-    #print(C)
     return L | C | R
 
 def pp_prg(p):
@@ -215,7 +240,6 @@ def pp_constructor(cons):
     I = cons.children[0]
     L = pp_var_list(cons.children[1])
     C = pp_bcom(cons.children[2])
-    #print(C)
     return "%s ( %s ) { %s \n}" % (I, L, C)
 
 def pp_attribut(a):
@@ -228,6 +252,7 @@ def pp_class(c):
     I = c.children[0]
     CONS = pp_constructor(c.children[1])
     return "class %s{ %s \n}" % (I, CONS)
+
 
 #ast = grammaire.parse("""main(x,y){
         #while(x){
@@ -263,13 +288,23 @@ def pp_class(c):
 #print(pp_constructor(ast_constructor))
 
 ast_string1=grammaire.parse(""" main(x){
- x = "coucou,hello.aaaaaa";
- return (x);}
+ 
+ z = "coucou" + "a";
+ return (z);}
  
  """)
 asm_string1 = asm_prg(ast_string1)
 #print(pp_prg(ast_string1))
 #print(asm_prg(ast_string1))
-f = open("ouf_string1.asm", "w")
+f = open("ouf_stringCon.asm", "w")
 f.write(asm_string1)
 f.close()
+
+#ast_stringLen = grammaire.parse("""main(x){
+   # x = "helloWorld";
+   # y = len(x);
+   # return (y);
+#}
+
+#""")
+#print(pp_prg(ast_stringLen))
