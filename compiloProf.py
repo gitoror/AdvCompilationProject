@@ -109,8 +109,8 @@ def vars_exp(e):
        list_str.append(e.children[0].value)
        return set()
     elif e.data == "exp_fonc_length":
-        #print(list_len)
         list_len.append(e.children[0].value)
+        print(list_len)
         return set()
     
 
@@ -207,7 +207,7 @@ def asm_prg(p):
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
     D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
     D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
-    # D += "\n"+"\n".join([f"len{list_str.index(v)} : db \"{v}\", 0" for v in list_len]) # declaire adress for length
+    D += "\n"+"\n".join([f"len{list_len.index(v)} : equ $ -\"{v}\" " for v in list_len]) # declaire adress for length
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[1])
     moule = moule.replace("BODY", C)
@@ -294,7 +294,7 @@ def pp_class(c):
 ast_string1=grammaire.parse(""" main(x){
  
  z = "coucou";
- i = len("coucoua");
+ i = len("zinc");
  return (i);}
  
  """)
