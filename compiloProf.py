@@ -6,7 +6,7 @@ exp : SIGNED_NUMBER              -> exp_nombre
 | exp OPBIN exp                  -> exp_opbin
 | "(" exp ")"                    -> exp_par
 |   "\"" STRING "\""           -> exp_str
-| "len" "(" IDENTIFIER ")"     -> exp_fonc_length
+| "len" "(" "\"" STRING "\"" ")"     -> exp_fonc_length
 | STRING "+" STRING             -> exp_fonc_concatenation
 | IDENTIFIER "[" SIGNED_NUMBER "]" -> exp_fonc_getletter
 com : IDENTIFIER "=" exp ";"     -> assignation
@@ -62,8 +62,12 @@ def asm_exp(e):
 
         return f"mov rax, str{list_str.index(e.children[0].value)} \0\n"
     elif e.data == "exp_fonc_length":
-        
-        return f"mov rax, len{list_len.index(e.children[0].value)} \0\n "
+        return f"mov rax, {len(e.children[0].value)}"
+        #return f"""
+        #mov rax, [{e.children[0].value}]\n
+        #mov rdi, rax
+        #call strlen
+        #"""
     
 
 
@@ -202,8 +206,8 @@ def asm_prg(p):
     moule = f.read()
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
     D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
-    D += "\n"+"\n".join([f"len{list_str.index(v)} : dq {len(v)}, 0" for v in list_str]) # declaire adress for length string
     D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
+    # D += "\n"+"\n".join([f"len{list_str.index(v)} : db \"{v}\", 0" for v in list_len]) # declaire adress for length
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[1])
     moule = moule.replace("BODY", C)
@@ -289,14 +293,15 @@ def pp_class(c):
 
 ast_string1=grammaire.parse(""" main(x){
  
- z = "coucou" + "a";
- return (z);}
+ z = "coucou";
+ i = len("coucoua");
+ return (i);}
  
  """)
 asm_string1 = asm_prg(ast_string1)
 #print(pp_prg(ast_string1))
 #print(asm_prg(ast_string1))
-f = open("ouf_stringCon.asm", "w")
+f = open("ouf_stringLen.asm", "w")
 f.write(asm_string1)
 f.close()
 

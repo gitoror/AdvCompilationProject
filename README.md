@@ -31,5 +31,17 @@ ast_string1=grammaire.parse(""" main(x){
  return (z);}
  
  """)
+
+ 3°) Length:
+
+ ex.
+
+ ast_string1=grammaire.parse(""" main(x){
+ 
+ z = "coucou";
+ i = len("coucoua");
+ return (i);}
+ 
+ """)
  
  
