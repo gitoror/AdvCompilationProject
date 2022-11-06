@@ -13,7 +13,7 @@ Fonctionnement String:
 1°) Pouvoir affichier un string sans espace:
 
 ex. 
-ast_string1=grammaire.parse(""" main(x){
+ast_string1=grammaire.parse(""" string main(x){
  
  z = "coucouAbc.DEf?" ;
  return (z);}
@@ -25,7 +25,7 @@ ast_string1=grammaire.parse(""" main(x){
  
  ex.
  
- ast_string1=grammaire.parse(""" main(x){
+ ast_string1=grammaire.parse(""" string main(x){
  
  z = "coucou" + "a";
  return (z);}
@@ -36,7 +36,7 @@ ast_string1=grammaire.parse(""" main(x){
 
  ex.
 
- ast_string1=grammaire.parse(""" main(x){
+ ast_string1=grammaire.parse(""" int main(x){
  
  z = "coucou";
  i = len("coucoua");

@@ -15,7 +15,7 @@ com : IDENTIFIER "=" exp ";"     -> assignation
 | "print" "(" exp ")"               -> print
 | lhs "=" exp ";"                   -> attribut
 bcom : (com)*
-prg : "main" "(" var_list ")" "{" bcom "return" "(" exp ")" ";"  "}"
+prg : IDENTIFIER " " "main" "(" var_list ")" "{" bcom "return" "(" exp ")" ";"  "}"
 class : "class" " " IDENTIFIER "{" constructor "}"
 constructor : IDENTIFIER "(" var_list ")" "{" bcom "}"
 lhs : IDENTIFIER                -> assignation  
@@ -24,7 +24,7 @@ var_list :                       -> vide
 | IDENTIFIER (","  IDENTIFIER)*  -> aumoinsune
 IDENTIFIER : /[a-zA-Z][a-zA-Z0-9]*/
 OPBIN : /[+\-*>]/
-STRING : /[a-zA-Z][a-zA-Z0-9.,!?]*/
+STRING : /[a-zA-Z][a-zA-Z0-9.,!?; ]*/             
 %import common.WS
 %import common.SIGNED_NUMBER
 %ignore WS
@@ -48,6 +48,14 @@ def asm_exp(e):
         if (e.children[0].data == "exp_str"):
             children = e.children[0].children[0] + e.children[2].children[0]
             return f"mov rax, sum{list_sum.index(children)} \0\n"
+            
+            #return f"""
+            #mov rdx, e.children[2].children[0]
+            #mov rax, e.children[0].children[0] 
+            #mov rsi, rdx
+            #mov rdi, rax
+            #strcat
+            #"""                                                         # try to use strcat to concanate strings, segmentation fault
         else:
             E1 = asm_exp(e.children[0])
             E2 = asm_exp(e.children[2])
@@ -67,7 +75,7 @@ def asm_exp(e):
         #mov rax, [{e.children[0].value}]\n
         #mov rdi, rax
         #call strlen
-        #"""
+        #"""                                                         # try to use strlen to find out length, segmentation fault
     
 
 
@@ -98,6 +106,7 @@ def vars_exp(e):
         return vars_exp(e.children[0])
     elif e.data == "exp_opbin":
         if (e.children[0].data == "exp_str"):
+
             children = e.children[0].children[0] + e.children[2].children[0]
             list_sum.append(children)
             return set()
@@ -204,18 +213,23 @@ def pp_var_list(vl):
 def asm_prg(p):
     f = open("moule.asm")
     moule = f.read()
+    if (p.children[0].value == "int"):
+        moule = moule.replace("FMT", "fmt : db \"%"+"d\", 10, 0")
+    elif(p.children[0].value == "string"):
+        moule = moule.replace("FMT", "fmt : db \"%"+"s\", 10, 0")
+    
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
     D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
     D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
     D += "\n"+"\n".join([f"len{list_len.index(v)} : equ $ -\"{v}\" " for v in list_len]) # declaire adress for length
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
-    C = asm_bcom(p.children[1])
+    C = asm_bcom(p.children[2])
     moule = moule.replace("BODY", C)
-    E = asm_exp(p.children[2])
+    E = asm_exp(p.children[3])
     moule = moule.replace("RETURN", E)
     s = ""
-    for i in range(len(p.children[0].children)):
-        v = p.children[0].children[i].value
+    for i in range(len(p.children[1].children)):
+        v = p.children[1].children[i].value
         e = f"""
         mov rbx, [argv]
         mov rdi, [rbx + { 8*(i+1)}]
@@ -228,15 +242,15 @@ def asm_prg(p):
     return moule
 
 def vars_prg(p):
-    L = set([t.value for t in p.children[0].children])
-    C = vars_bcom(p.children[1])
-    R = vars_exp(p.children[2])
+    L = set([t.value for t in p.children[1].children])
+    C = vars_bcom(p.children[2])
+    R = vars_exp(p.children[3])
     return L | C | R
 
 def pp_prg(p):
-    L = pp_var_list(p.children[0])
-    C = pp_bcom(p.children[1])
-    R = pp_exp(p.children[2])
+    L = pp_var_list(p.children[1])
+    C = pp_bcom(p.children[2])
+    R = pp_exp(p.children[3])
     return "main( %s ) { %s return(%s);\n}" % (L, C, R)
 
 def pp_constructor(cons):
@@ -291,17 +305,16 @@ def pp_class(c):
 #print(pp_class(ast_class))
 #print(pp_constructor(ast_constructor))
 
-ast_string1=grammaire.parse(""" main(x){
+ast_string1=grammaire.parse(""" string main(x){
+ z = "cou cou"+"hello";
  
- z = "coucou";
- i = len("zinc");
- return (i);}
+ return (z);}
  
  """)
 asm_string1 = asm_prg(ast_string1)
 #print(pp_prg(ast_string1))
 #print(asm_prg(ast_string1))
-f = open("ouf_stringLen.asm", "w")
+f = open("ouf_stringCon.asm", "w")
 f.write(asm_string1)
 f.close()
 

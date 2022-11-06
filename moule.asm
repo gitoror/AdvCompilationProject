@@ -1,7 +1,7 @@
 extern printf, atoi
 
 section .data
-fmt : db "%d", 10, 0
+FMT
 argc : dq 0
 argv : dq 0
 DECL_VARS
