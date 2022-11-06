@@ -12,7 +12,7 @@ Fonctionnement String:
 
 remarque: lorsque l'on veut afficher un string, il faut remplacer "%d" par "%s" dans fmt (moule.asm)
 
-1°) Pouvoir affichier un string sans espace:
+1°) Pouvoir affichier un string sans ou avec espace:
 
 remarque: 
 
@@ -21,7 +21,7 @@ bug: on ne peut pas afficher l'entrée (en string) de la fonction à cause de mo
 ex. 
 ast_string1=grammaire.parse(""" string main(x){
  
- z = "coucouAbc.DEf?" ;
+ z = "coucou Abc.DEf?" ;
  return (z);}
  
  """)
