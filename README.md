@@ -10,7 +10,13 @@ dossier : compilo, readme, doc de syntaxe, transparents de la présentation
 
 Fonctionnement String:
 
+remarque: lorsque l'on veut afficher un string, il faut remplacer "%d" par "%s" dans fmt (moule.asm)
+
 1°) Pouvoir affichier un string sans espace:
+
+remarque: 
+
+bug: on ne peut pas afficher l'entrée (en string) de la fonction à cause de moule.asm (à résoudre)
 
 ex. 
 ast_string1=grammaire.parse(""" string main(x){
