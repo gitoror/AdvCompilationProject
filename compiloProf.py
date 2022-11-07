@@ -46,16 +46,15 @@ def asm_exp(e):
     elif e.data == "exp_opbin":
 
         if (e.children[0].data == "exp_str"):
-            children = e.children[0].children[0] + e.children[2].children[0]
-            return f"mov rax, sum{list_sum.index(children)} \0\n"
-            
-            #return f"""
-            #mov rdx, e.children[2].children[0]
-            #mov rax, e.children[0].children[0] 
-            #mov rsi, rdx
-            #mov rdi, rax
-            #strcat
-            #"""                                                         # try to use strcat to concanate strings, segmentation fault
+            list_sum.append(e.children[0].children[0].value)
+            list_sum.append(e.children[2].children[0].value)
+            return f"""
+            mov rdx, {e.children[2].children[0].value}
+            mov rax, {e.children[0].children[0].value} 
+            mov rsi, rdx
+            mov rdi, rax
+            call strcat
+            """                                                         # try to use strcat to concanate strings, segmentation fault
         else:
             E1 = asm_exp(e.children[0])
             E2 = asm_exp(e.children[2])
@@ -106,9 +105,8 @@ def vars_exp(e):
         return vars_exp(e.children[0])
     elif e.data == "exp_opbin":
         if (e.children[0].data == "exp_str"):
-
-            children = e.children[0].children[0] + e.children[2].children[0]
-            list_sum.append(children)
+            list_sum.append(e.children[0].children[0].value)
+            list_sum.append(e.children[2].children[0].value)
             return set()
         else:
             L = vars_exp(e.children[0])
@@ -119,7 +117,6 @@ def vars_exp(e):
        return set()
     elif e.data == "exp_fonc_length":
         list_len.append(e.children[0].value)
-        print(list_len)
         return set()
     
 
@@ -220,8 +217,9 @@ def asm_prg(p):
     
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
     D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
-    D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
     D += "\n"+"\n".join([f"len{list_len.index(v)} : equ $ -\"{v}\" " for v in list_len]) # declaire adress for length
+    print(list_sum)
+    D += "\n"+"\n".join([f"{v} : db \"{v}\", 0" for v in list_sum])
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[2])
     moule = moule.replace("BODY", C)
@@ -254,7 +252,6 @@ def pp_prg(p):
     return "main( %s ) { %s return(%s);\n}" % (L, C, R)
 
 def pp_constructor(cons):
-    #print(cons.children[0])
     I = cons.children[0]
     L = pp_var_list(cons.children[1])
     C = pp_bcom(cons.children[2])
@@ -306,9 +303,9 @@ def pp_class(c):
 #print(pp_constructor(ast_constructor))
 
 ast_string1=grammaire.parse(""" string main(x){
- z = "cou cou"+"hello";
+ x = "coucou"+"hello";
  
- return (z);}
+ return (x);}
  
  """)
 asm_string1 = asm_prg(ast_string1)

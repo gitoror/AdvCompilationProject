@@ -17,6 +17,7 @@ remarque: lorsque l'on veut afficher un string, il faut remplacer "%d" par "%s" 
 remarque: 
 
 bug: on ne peut pas afficher l'entrée (en string) de la fonction à cause de moule.asm (à résoudre)
+résolution : remplace ligne call atoi par mov rax, rdi 
 
 ex. 
 ast_string1=grammaire.parse(""" string main(x){
