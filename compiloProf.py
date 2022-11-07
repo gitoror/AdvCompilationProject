@@ -2,25 +2,39 @@ import lark
 
 grammaire = lark.Lark(r"""
 exp : SIGNED_NUMBER              -> exp_nombre
-| IDENTIFIER                     -> exp_var
+| IDENTIFIER exp_nombre          -> exp_var 
 | exp OPBIN exp                  -> exp_opbin
 | "(" exp ")"                    -> exp_par
+|   "\"" STRING "\""           -> exp_str
+| "len" "(" "\"" STRING "\"" ")"     -> exp_fonc_length
+| STRING "+" STRING             -> exp_fonc_concatenation
+| IDENTIFIER "[" SIGNED_NUMBER "]" -> exp_fonc_getletter
 com : IDENTIFIER "=" exp ";"     -> assignation
 | "if" "(" exp ")" "{" bcom "}"  -> if
 | "while" "(" exp ")" "{" bcom "}"  -> while
 | "print" "(" exp ")"               -> print
+| lhs "=" exp ";"                   -> attribut
 bcom : (com)*
 prg : "main" "(" var_list ")" "{" bcom "return" "(" exp ")" ";"  "}"
+class : "class" " " IDENTIFIER "{" constructor "}"
+constructor : IDENTIFIER "(" var_list ")" "{" bcom "}"
+lhs : IDENTIFIER                -> assignation  
+| IDENTIFIER "." IDENTIFIER     -> self
 var_list :                       -> vide
 | IDENTIFIER (","  IDENTIFIER)*  -> aumoinsune
 IDENTIFIER : /[a-zA-Z][a-zA-Z0-9]*/
 OPBIN : /[+\-*>]/
+STRING : /[a-zA-Z][a-zA-Z0-9.,!?]*/
 %import common.WS
 %import common.SIGNED_NUMBER
 %ignore WS
 """,start="prg")
 
 op = {'+' : 'add', '-' : 'sub'}
+
+list_str = []
+list_len = []
+list_sum = []
 
 def asm_exp(e):
     if e.data == "exp_nombre":
@@ -29,36 +43,107 @@ def asm_exp(e):
         return f"mov rax, [{e.children[0].value}]\n"
     elif e.data == "exp_par":
         return asm_exp(e.children[0])
-    else:
-        E1 = asm_exp(e.children[0])
-        E2 = asm_exp(e.children[2])
-        return f"""
-        {E2}
-        push rax
-        {E1}
-        pop rbx
-        {op[e.children[1].value]} rax, rbx
-        """
+    elif e.data == "exp_opbin":
+        if (e.children[0].data == "exp_var") :
+            if (e.children[2].data == "exp_str") :
+                if (e.children[0].children[1] == 0) :
+                    e.children[0].children[0] = str(e.children[0].children[0])
+                    e.children[0].children[1] = 1
+                children = e.children[0].children[0] + e.children[2].children[0]
+                return f"""
+                mov rax, sum{list_sum.index(children)} \0\n"
+                """
+            elif (e.children[1].data == "exp_nombre") :
+                if (e.children[0].children[1] == 1) :
+                    e.children[0].children[0] = str(e.children[0].children[0])
+                    e.children[0].children[1] = 1
+                E1 = asm_exp(e.children[0].children[0])
+                E2 = asm_exp(e.children[2])
+                return f"""
+                {E2}
+                push rax
+                {E1}
+                pop rbx
+                {op[e.children[1].value]} rax, rbx
+                """
+        if (e.children[0].data == "exp_str"):
+            children = e.children[0].children[0] + e.children[2].children[0]
+            return f"mov rax, sum{list_sum.index(children)} \0\n"
+        elif (e.children[0].data == "exp_nombre"):
+            E1 = asm_exp(e.children[0])
+            E2 = asm_exp(e.children[2])
+            return f"""
+            {E2}
+            push rax
+            {E1}
+            pop rbx
+            {op[e.children[1].value]} rax, rbx
+            """
+    elif e.data == "exp_str":
+
+        return f"mov rax, str{list_str.index(e.children[0].value)} \0\n"
+    elif e.data == "exp_fonc_length":
+        return f"mov rax, {len(e.children[0].value)}"
+        #return f"""
+        #mov rax, [{e.children[0].value}]\n
+        #mov rdi, rax
+        #call strlen
+        #"""
+        
+        
+    
+
 
 def pp_exp(e):
-    if e.data in {"exp_nombre", "exp_var"}:
+    if e.data == "exp_nombre":
         return e.children[0].value
+    elif e.data == "exp_var":
+        t = e.children[0].children[0]
+        if (e.children[0].children[1]==0) :
+            t = "nombre"
+        if (e.children[0].children[1]==1) :
+            t = "string"
+        return f"({e.children[0].children[0]} \t Type : {t})"
     elif e.data == "exp_par":
         return f"({pp_exp(e.children[0])})"
-    else:
+    elif e.data == "exp_opbin":
+        
         return f"{pp_exp(e.children[0])} {e.children[1].value} {pp_exp(e.children[2])}"
+    elif e.data == "exp_str":
+        return f"{e.children[0].value}"
+    elif e.data == "exp_fonc_length":
+        return f"len({e.children[0].value})"
+    elif e.data == "exp_fonc_concatenation":
+        return f"{e.children[0].value}+{e.children[1].value}"
+    elif e.data == "exp_fonc_getletter":
+        return f"{e.children[0].value}[{e.children[1].value}]"
+            
+
 
 def vars_exp(e):
-    if e.data  == "exp_nombre":
+    if e.data  == "exp_nombre" :
         return set()
     elif e.data ==  "exp_var":
         return { e.children[0].value }
     elif e.data == "exp_par":
         return vars_exp(e.children[0])
-    else:
-        L = vars_exp(e.children[0])
-        R = vars_exp(e.children[2])
-        return L | R
+    elif e.data == "exp_opbin":
+        if (e.children[0].data == "exp_str"):
+            children = e.children[0].children[0] + e.children[2].children[0]
+            list_sum.append(children)
+            return set()
+        else:
+            L = vars_exp(e.children[0])
+            R = vars_exp(e.children[2])
+            return L | R
+    elif e.data == "exp_str":
+       list_str.append(e.children[0].value)
+       return set()
+    elif e.data == "exp_fonc_length":
+        #print(list_len)
+        list_len.append(e.children[0].value)
+        return set()
+    
 
 cpt = 0
 def next():
@@ -68,7 +153,7 @@ def next():
 
 def asm_com(c):
     if c.data == "assignation":
-        E = asm_exp(c.children[1])
+        E = asm_exp(c.children[1].children[0])
         return f"""
         {E}
         mov [{c.children[0].value}], rax        
@@ -104,6 +189,37 @@ fin{n} : nop
         mov rsi, rax
         call printf
         """
+        
+    elif c.data == "atoi":
+        E = asm_exp(c.children[1])
+        t = c.children[0].value
+        return f"""
+        {E}
+        mov fmt, [{t}]
+        mov rdi, fmt
+        call atoi
+        mov [{c.children[0].children[0]}], rax
+        """
+        
+    elif c.data == "itoa":
+        E = asm_exp(c.children[1])
+        x = c.children[0].value
+        return f"""
+        {E}
+        mov fmt, [{x}]
+        mov rdi, fmt
+        call itoa
+        mov [{c.children[0].children[0]}], rax
+        """
+        
+    elif c.data == "type":
+        E = asm_exp(c.children[0].children[1])
+        return f"""
+        {E}
+        mov rdi, fmt
+        mov rsi, rax
+        call printf
+        """
 
 def pp_com(c):
     if c.data == "assignation":
@@ -116,12 +232,19 @@ def pp_com(c):
         return f"while ({pp_exp(c.children[0])}) {{{x}}}"
     elif c.data == "print":
         return f"print({pp_exp(c.children[0])})"
+    elif c.data == "attribut":
+        return f"{pp_attribut(c.children[0])} = {pp_exp(c.children[1])};"
+    elif c.data == "atoi":
+        return f"{c.children[0].children[0]} = atoi({pp_exp(c.children[1])});"
+    elif c.data == "itoa":
+        return f"{c.children[0].children[0]} = itoa({pp_exp(c.children[1])});"
+
 
 
 def vars_com(c):
-    if c.data == "assignation":
+    if c.data in {"assignation", "atoi", "itoa"}:
         R = vars_exp(c.children[1])
-        return {c.children[0].value} | R
+        return {c.children[0].children[0]} | R
     elif c.data in {"if", "while"}:
         B = vars_bcom(c.children[1])
         E = vars_exp(c.children[0]) 
@@ -147,12 +270,15 @@ def pp_var_list(vl):
 def asm_prg(p):
     f = open("moule.asm")
     moule = f.read()
+    D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
+    D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
+    D += "\n"+"\n".join([f"sum{list_sum.index(v)} : db \"{v}\", 0" for v in list_sum]) # declaire adress for sum (concatenation)
+    # D += "\n"+"\n".join([f"len{list_str.index(v)} : db \"{v}\", 0" for v in list_len]) # declaire adress for length
+    moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
     C = asm_bcom(p.children[1])
     moule = moule.replace("BODY", C)
     E = asm_exp(p.children[2])
     moule = moule.replace("RETURN", E)
-    D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
-    moule = moule.replace("DECL_VARS", D)
     s = ""
     for i in range(len(p.children[0].children)):
         v = p.children[0].children[i].value
@@ -179,17 +305,54 @@ def pp_prg(p):
     R = pp_exp(p.children[2])
     return "main( %s ) { %s return(%s);\n}" % (L, C, R)
 
+def pp_constructor(cons):
+    #print(cons.children[0])
+    I = cons.children[0]
+    L = pp_var_list(cons.children[1])
+    C = pp_bcom(cons.children[2])
+    return "%s ( %s ) { %s \n}" % (I, L, C)
 
-ast = grammaire.parse("""main(x,y){
-        while(x){
-            x = x - 1;
-            y = y + 1;
-        }
-    return (y);
-}
-""")
-asm = asm_prg(ast)
-f = open("ouf.asm", "w")
-f.write(asm)
+def pp_attribut(a):
+    if a.data == "assignation":
+        return f"{a.children[0].value}"
+    elif a.data == "self":
+        return f"{a.children[0].value}.{a.children[1].value}"
+
+def pp_class(c):
+    I = c.children[0]
+    CONS = pp_constructor(c.children[1])
+    return "class %s{ %s \n}" % (I, CONS)
+
+
+#ast = grammaire.parse("""main(x,y){
+        #while(x){
+           # x = x - 1;
+           # y = y + 1;
+        #}
+    #return (y);
+#}
+#""")
+#asm = asm_prg(ast)
+#f = open("ouf.asm", "w")
+#f.write(asm)
+#f.close()
+
+ast_string1=grammaire.parse(""" main(x){
+ 
+ z = "coucou";
+ i = len("coucoua");
+ return (i);}
+ 
+ """)
+asm_string1 = asm_prg(ast_string1)
+#print(pp_prg(ast_string1))
+#print(asm_prg(ast_string1))
+f = open("ouf_stringLen.asm", "w")
+f.write(asm_string1)
 f.close()
 
+#ast_atoi = grammaire.parse("""
+    # x = 15;
+    # y = atoi(x);
+    #
+# """)
