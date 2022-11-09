@@ -13,6 +13,7 @@ exp : IDENTIFIER                           -> exp_var
 | "(" exp ")"                              -> exp_par
 | IDENTIFIER "(" var_list ")"              -> exp_call_class_constructor
 | IDENTIFIER "." IDENTIFIER                -> exp_id_attribute
+| IDENTIFIER "." exp                       -> exp_id_follow_attr
 com : lhs "=" exp ";"                         -> lhs_assignation
 | "if" "(" exp ")" "{" bcom "}"               -> if
 | "while" "(" exp ")" "{" bcom "}"            -> while
@@ -24,7 +25,9 @@ constructor : "def" IDENTIFIER "(" var_list ")" "{" bcom "}"
 methods : (method)*
 method : "def" IDENTIFIER "(" var_list ")" "{" bcom "}"
 var_list :                           -> vide
-| IDENTIFIER ("," IDENTIFIER)*       -> aumoinsune
+| var ("," var)*       -> aumoinsune
+var : IDENTIFIER -> var 
+| IDENTIFIER " " IDENTIFIER -> object_var
 classes: -> no_class
 | (class)* -> at_least_class
 prg : "main" "(" var_list ")" "{" classes bcom "return" "(" exp ")" ";" "}"
@@ -109,7 +112,10 @@ def asm_exp(e, className=None):
     return f"mov rax, {e.children[0].value}\n"
   elif e.data == "exp_var":
     if className!=None:
-      if e.children[0].value in Class_list[f"{className}"]["arg"]:
+      if e.children[0].value in Class_dic[f"{className}"]["arg"]:
+        arg = e.children[0].value
+        return f"mov rax, [class.arg.{className}.{arg}]\n"
+      elif e.children[0].value in Class_dic[f"{className}"]["oarg"]:
         arg = e.children[0].value
         return f"mov rax, [class.arg.{className}.{arg}]\n"
     return f"mov rax, [{e.children[0].value}]\n"
@@ -133,7 +139,7 @@ def asm_exp(e, className=None):
   elif e.data == "exp_call_class_constructor":
     # not here bcs lack name of obj, see in com -> lhs_assignation
     # Update : could have move back the code here bcs of the
-    # disctionary Class_list
+    # disctionary Class_dic
     pass
 
 cpt = 0
@@ -196,11 +202,19 @@ fin{n} : nop"""
       s=""
       i = 0
       for var in ConstrVars:
-        e=f"""
-        mov rax, [{var.value}]
-        mov [class.arg.{ConstrName}.{Class_list[f"{ConstrName}"]["arg"][i]}], rax
-        """
-        s+=e
+        if var.data == "object_var":
+          #class.oarg.Human.Car.speed
+          otherClassName = var.children[0].value
+          for attribute in Class_dic[f"{otherClassName}"]["attr"]:
+            s+=f"""
+            mov rax, [{var.children[1].value}.{attribute}]
+            mov [class.oarg.{ConstrName}.{otherClassName}.{attribute}], rax
+            """
+        elif var.data == "var":
+          s+=f"""
+          mov rax, [{var.children[0].value}]
+          mov [class.arg.{ConstrName}.{Class_dic[f"{ConstrName}"]["arg"][i]}], rax
+          """
         i+=1
       # Call constructor
       s = s+ f"""
@@ -208,30 +222,54 @@ fin{n} : nop"""
       """
       # Affect class attr to the object attr
       t=""
-      for attribute in Class_list[f"{ConstrName}"]["attr"]:
+      for objArg in Class_dic[f"{ConstrName}"]["oarg"]:
+        otherClassName = Class_dic[f"{ConstrName}"]["oarg"][f"{objArg}"]
+        for attribute in Class_dic[f"{otherClassName}"]["attr"]:
+          if lhs.data == "lhs_var":
+            t+=f"""
+            mov rax, [class.{ConstrName}.{otherClassName}.{attribute}]
+            mov [{lhs.children[0].value}.{objArg}.{attribute}], rax
+            """
+          elif lhs.data == "lhs_id_attribute":
+            t+=f"""
+            mov rax, [class.{ConstrName}.{otherClassName}.{attribute}]
+            mov [{lhs.children[0].value}.{lhs.children[1].value}.{attribute}], rax
+            """
+      for attribute in Class_dic[f"{ConstrName}"]["attr"]:
         if lhs.data == "lhs_var":
-          g=f"""
+          t+=f"""
           mov rax, [class.{ConstrName}.{attribute}]
           mov [{lhs.children[0].value}.{attribute}], rax
           """
-          t+=g
         elif lhs.data == "lhs_id_attribute":
-          g=f"""
+          t+=f"""
           mov rax, [class.{ConstrName}.{attribute}]
           mov [{lhs.children[0].value}.{lhs.children[1].value}.{attribute}], rax
           """
-          t+=g
       return s+t
+    
     else:
       E = asm_exp(c.children[1],className)
       if lhs.data == "lhs_id_attribute":
         if lhs.children[0].value == "self":
           # if rhs = arg of the constr
           if c.children[1].data == "exp_var" and\
-                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+                c.children[1].children[0].value in Class_dic[f"{className}"]["arg"]:
             arg = c.children[1].children[0].value
             r = f"""mov rax, [class.arg.{className}.{arg}]
-            mov [class.{className}.{lhs.children[1].value}], rax"""
+            mov [class.{className}.{lhs.children[1].value}], rax
+            """
+          # rhs = object arg ctr
+          if c.children[1].data == "exp_var" and\
+                c.children[1].children[0].value in Class_dic[f"{className}"]["oarg"]:
+            arg = c.children[1].children[0].value
+            otherClassName = Class_dic[f"{className}"]["oarg"][f"{arg}"]
+            r=""
+            for attribute in Class_dic[f"{otherClassName}"]["attr"]:
+              r += f"""
+              mov rax, [class.oarg.{className}.{otherClassName}.{attribute}]
+              mov [class.{className}.{otherClassName}.{attribute}], rax
+              """
           else:
             r=f"""
             {E}
@@ -240,10 +278,11 @@ fin{n} : nop"""
         else:
           # if rhs = arg of the constr
           if c.children[1].data == "exp_var" and\
-                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+                c.children[1].children[0].value in Class_dic[f"{className}"]["arg"]:
             arg = c.children[1].children[0].value
             r = f"""mov rax, [class.arg.{className}.{arg}]
-            mov [{lhs.children[0].value}.{lhs.children[1].value}], rax"""
+            mov [{lhs.children[0].value}.{lhs.children[1].value}], rax
+            """
           else:
             r=f"""
             {E}
@@ -252,10 +291,11 @@ fin{n} : nop"""
       elif lhs.data == "lhs_var":
          # if rhs = arg of the constr
           if c.children[1].data == "exp_var" and\
-                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+                c.children[1].children[0].value in Class_dic[f"{className}"]["arg"]:
             arg = c.children[1].children[0].value
             r = f"""mov rax, [class.arg.{className}.{arg}]
-            mov [{lhs.children[0].value}], rax"""
+            mov [{lhs.children[0].value}], rax
+            """
           else:
             r=f"""
             {E}
@@ -281,7 +321,7 @@ def asm_prg(p):
   moule = moule.replace("DECL_CLASS", DC)
   s = ""
   for i in range(len(p.children[0].children)):
-    v = p.children[0].children[i].value
+    v = p.children[0].children[i].children[0].value
     e = f"""
     mov rbx, [argv]
     mov rdi, [rbx + { 8*(i+1) }]
@@ -327,8 +367,12 @@ def vars_com(c):
         ObjectName = c.children[0].children[0].value
         ConstrName = c.children[1].children[0].value
         ObjAttributeSet = set()
-        for attribute in Class_list[f"{ConstrName}"]["attr"]:
+        for attribute in Class_dic[ConstrName]["attr"]:
           ObjAttributeSet.add(f"{ObjectName}.{attribute}")
+        for objArg in Class_dic[ConstrName]["oarg"]:
+          otherClassName = Class_dic[ConstrName]["oarg"][objArg]
+          for attribute in Class_dic[f"{otherClassName}"]["attr"]:
+            ObjAttributeSet.add(f"{ObjectName}.{objArg}.{attribute}")
         return ObjAttributeSet
     else:
       if c.children[0].data == "lhs_var":
@@ -341,19 +385,6 @@ def vars_com(c):
         # soit obj att 
         else :
           return set(f"{lhs.children[0].value}.{lhs.children[1].value}")
-  
-  if c.data == "lhs_assignation":
-    if c.children[0].data == "lhs_var":
-      R = vars_exp(c.children[1])
-      return {c.children[0].children[0].value} | R
-    if c.children[0].data == "lhs_id_attribute":
-      lhs = c.children[0]
-      # soit self att
-      if lhs.children[0].value == "self":
-        return set() # handle in vars_class bcs need class name
-      # soit obj att 
-      else :
-        return set(f"{lhs.children[0].value}.{lhs.children[1].value}")
   if c.data in {"if", "while"}:
     B = vars_bcom(c.children[1])
     E = vars_exp(c.children[0])
@@ -367,14 +398,31 @@ def vars_bcom(bc):
     S = S | vars_com(c)
   return S
 
-Class_list = {}
+Class_dic = {}
 
 def vars_class(c):
-  Class_list[f"{c.children[0].value}"] = {"attr":[],"arg":[],"meth":[]}
+  Class_dic[f"{c.children[0].value}"] = {"attr":[],"arg":[],"meth":[],"oarg":{},"oattr":[]}
   Constructor = c.children[1]
-  Args = set([f"class.arg.{c.children[0].value}.{t.value}" for t in Constructor.children[1].children])
+  Args = set([f"class.arg.{c.children[0].value}.{t.children[0].value}" for t in Constructor.children[1].children])
+  OArgs = set()
+  OAttr = set()
   for t in Constructor.children[1].children:
-    Class_list[f"{c.children[0].value}"]["arg"].append(t.value)
+     if t.data == "object_var":
+       otherClassName = t.children[0].value
+       # stocke la classe cet arg du ctr 
+       Class_dic[f"{c.children[0].value}"]["oarg"][f"{t.children[1].value}"]=t.children[0].value 
+       print(f"{otherClassName}")
+       print(Class_dic)
+       print(Class_dic[f"{otherClassName}"]["attr"])
+       for attribute in Class_dic[f"{otherClassName}"]["attr"]:
+          # class.oarg.Human.Car.speed
+          OArgs.add(f"class.oarg.{c.children[0].value}.{t.children[0].value}.{attribute}")
+          # class.Human.Car.speed
+          OAttr.add(f"class.{c.children[0].value}.{t.children[0].value}.{attribute}")
+          Class_dic[f"{c.children[0].value}"]["oattr"].append(attribute)
+     else:
+        print(c)
+        Class_dic[f"{c.children[0].value}"]["arg"].append(t.children[0].value)
   C = vars_bcom(c.children[1].children[2])
   ClassAtt = set()
   ConstrBcom = Constructor.children[2]
@@ -384,20 +432,15 @@ def vars_class(c):
         lhs = com.children[0]
         # if it is a self attribute (= in the constructor)
         if lhs.children[0].value == "self":
-          Class_list[f"{c.children[0].value}"]["attr"].append(lhs.children[1].value)
+          Class_dic[f"{c.children[0].value}"]["attr"].append(lhs.children[1].value)
           ClassAtt.add(f"class.{c.children[0].value}.{lhs.children[1].value}")
-  print("Le set")
-  print(Args | C | ClassAtt)
-  print("fin set")
-  return Args | C | ClassAtt
+  
+  return Args | OArgs | OAttr | C | ClassAtt
 
 def vars_prg(p):
-  L = set([t.value for t in p.children[0].children])
+  L = set([t.children[0].value for t in p.children[0].children])
   if p.children[1].data == "at_least_class":
-     print("OK")
-     
      O=set()
-     print(p.children[1].children)
      for class_ in p.children[1].children:
       vars_class(class_)
       O = O | vars_class(class_)
@@ -409,29 +452,27 @@ def vars_prg(p):
 ## MAIN                                                                                            
 ####################################################################################################################
 if __name__ == '__main__':
+  
   ast = grammaire.parse("""
-  main(X,Y,Z) {
-    class Car {
-      def Car(speed) {
-        self.speed=speed+1;
+    main(X,Y,Z) {
+      class Car {
+        def Car(speed) {
+          self.speed=speed+1;
+        }
       }
-    }
-    class Human {
-      def Human(size,age) {
-        self.footSize = size-1;
-        self.age=age;
+      class Human {
+        def Human(Car car) {
+          self.mycar=car;
+        }
       }
-    }
-    speed=28;
-    car = Car(speed);
-    s=1;
-    a=21;
-    h=Human(s,a);
+      speed=28;
+      car = Car(speed);
+      h=Human(Car car);
+      Y = h.mycar.speed;
+      return (Y);
+      }
+      """)
 
-    Y = h.age;
-    return (Y);
-  }
-  """)
   print(ast)
   
   #print(pp_prg(ast))
@@ -440,11 +481,32 @@ if __name__ == '__main__':
   f.write(asm)
   f.close()
  
-  print(Class_list)  
+  print(Class_dic)  
 ####################################################################################################################
 ## NOTES                                                                                                      
 ####################################################################################################################
 """
+ast = grammaire.parse(
+  main(X,Y,Z) {
+    class Car {
+      def Car(speed) {
+        self.speed=speed+1;
+      }
+    }
+    class Human {
+      def Human(Car car) {
+        self.mycar=car;
+      }
+    }
+    speed=28;
+    car = Car(speed);
+    h=Human(Car car);
+
+    Y = car.speed;
+    return (Y);
+  }
+  )
+
 #ast= grammaire.parse("Abcd,  \n x")
   #ast= grammaire.parse(""
   #x=3;
