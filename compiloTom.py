@@ -13,21 +13,21 @@ exp : IDENTIFIER                           -> exp_var
 | "(" exp ")"                              -> exp_par
 | IDENTIFIER "(" var_list ")"              -> exp_call_class_constructor
 | IDENTIFIER "." IDENTIFIER                -> exp_id_attribute
-com : IDENTIFIER "=" exp ";"                  -> assignation
-| lhs "=" exp ";"                             -> lhs_assignation
+com : lhs "=" exp ";"                         -> lhs_assignation
 | "if" "(" exp ")" "{" bcom "}"               -> if
 | "while" "(" exp ")" "{" bcom "}"            -> while
 | "print" "(" exp ")"                         -> print
 | lhs "." method "()"                         -> method_call
 bcom : (com)*
-class :                                       -> no_class
-| "class" IDENTIFIER "{" constructor methods"}"      -> create_class
+class : "class" IDENTIFIER "{" constructor methods"}"      -> create_class
 constructor : "def" IDENTIFIER "(" var_list ")" "{" bcom "}"
 methods : (method)*
 method : "def" IDENTIFIER "(" var_list ")" "{" bcom "}"
 var_list :                           -> vide
 | IDENTIFIER ("," IDENTIFIER)*       -> aumoinsune
-prg : "main" "(" var_list ")" "{" class bcom "return" "(" exp ")" ";" "}"
+classes: -> no_class
+| (class)* -> at_least_class
+prg : "main" "(" var_list ")" "{" classes bcom "return" "(" exp ")" ";" "}"
 """, 
 start="prg")
 
@@ -104,14 +104,18 @@ def asm_lhs(lhs):
     return f"{lhs.children[0].value}"+"."+f"{lhs.children[1].value}"
 
 op = {'+':"add", '-':"sub"}
-def asm_exp(e):
+def asm_exp(e, className=None):
   if e.data == "exp_nombre":
     return f"mov rax, {e.children[0].value}\n"
   elif e.data == "exp_var":
+    if className!=None:
+      if e.children[0].value in Class_list[f"{className}"]["arg"]:
+        arg = e.children[0].value
+        return f"mov rax, [class.arg.{className}.{arg}]\n"
     return f"mov rax, [{e.children[0].value}]\n"
   elif e.data == "exp_opbin":
-    E1 = asm_exp(e.children[0]) # E1 = 'gamma de E1'
-    E2 = asm_exp(e.children[2])
+    E1 = asm_exp(e.children[0],className) # E1 = 'gamma de E1'
+    E2 = asm_exp(e.children[2],className)
     # l'indentation sera visible dans le code assembleur
     return f"""
     {E2}
@@ -121,10 +125,15 @@ def asm_exp(e):
     {op[e.children[1].value]} rax, rbx
     """
   elif e.data == "exp_par":
-    return asm_exp(e.children[0]) # Compile ce qu'il y a 
+    return asm_exp(e.children[0],className) # Compile ce qu'il y a 
     # a l' interieur des parentheses
+  elif e.data == "exp_id_attribute":
+    attribute = f"{e.children[0].value}.{e.children[1].value}"
+    return f"mov rax, [{attribute}]"
   elif e.data == "exp_call_class_constructor":
     # not here bcs lack name of obj, see in com -> lhs_assignation
+    # Update : could have move back the code here bcs of the
+    # disctionary Class_list
     pass
 
 cpt = 0
@@ -133,29 +142,25 @@ def next():
   cpt+=1
   return cpt
 
-
-
-
-
 def asm_class(c):
   # ecrire le ctr
   Constructor = c.children[1]
   return f"""
   {c.children[0]}Init:
-    {Constructor.children[2]}
+    {asm_bcom(Constructor.children[2],Constructor.children[0].value)}
     ret
   """
   # ecrire les meth
 
-def asm_com(c):
+def asm_com(c, className=None):
   if c.data == "assignation":
-    E = asm_exp(c.children[1])
+    E = asm_exp(c.children[1],className)
     return f"""
     {E}
     mov [{c.children[0].value}], rax"""
   elif c.data == "if":
-    E = asm_exp(c.children[0])
-    C = asm_bcom(c.children[1])
+    E = asm_exp(c.children[0],className)
+    C = asm_bcom(c.children[1],className)
     n = next()
     return f"""
     {E}
@@ -164,8 +169,8 @@ def asm_com(c):
     {C}
 fin{n} : nop"""
   elif c.data == "while":
-      E = asm_exp(c.children[0])
-      C = asm_bcom(c.children[1])
+      E = asm_exp(c.children[0],className)
+      C = asm_bcom(c.children[1],className)
       n = next()
       return f"""
       debut{n} :
@@ -183,49 +188,96 @@ fin{n} : nop"""
     mov rsi, rax
     call printf"""
   elif c.data == "lhs_assignation":
+    lhs = c.children[0]
     if c.children[1].data == "exp_call_class_constructor":
       ConstrVars = c.children[1].children[1].children
       ConstrName = c.children[1].children[0].value
-      # Load args + call constr => creer attr objet
-      # Cmt je sais cb d'att l'objet va avoir ????
+      # Load ctr args into class args before calling constructor 
       s=""
       i = 0
       for var in ConstrVars:
         e=f"""
         mov rax, [{var.value}]
-        mov [class.{ConstrName}.{Class_list[0][i]}], rax
+        mov [class.arg.{ConstrName}.{Class_list[f"{ConstrName}"]["arg"][i]}], rax
         """
         s+=e
         i+=1
+      # Call constructor
       s = s+ f"""
       call {ConstrName}Init
       """
+      # Affect class attr to the object attr
       t=""
-      j = 0
-      for var in ConstrVars:
-        g=f"""
-        mov rax, [class.{ConstrName}.{Class_list[0][i]}]
-        mov [{ConstrName}.{Class_list[0][i]}], rax
-        """
-        t+=g
-        j+=1
+      for attribute in Class_list[f"{ConstrName}"]["attr"]:
+        if lhs.data == "lhs_var":
+          g=f"""
+          mov rax, [class.{ConstrName}.{attribute}]
+          mov [{lhs.children[0].value}.{attribute}], rax
+          """
+          t+=g
+        elif lhs.data == "lhs_id_attribute":
+          g=f"""
+          mov rax, [class.{ConstrName}.{attribute}]
+          mov [{lhs.children[0].value}.{lhs.children[1].value}.{attribute}], rax
+          """
+          t+=g
       return s+t
-      
-   
+    else:
+      E = asm_exp(c.children[1],className)
+      if lhs.data == "lhs_id_attribute":
+        if lhs.children[0].value == "self":
+          # if rhs = arg of the constr
+          if c.children[1].data == "exp_var" and\
+                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+            arg = c.children[1].children[0].value
+            r = f"""mov rax, [class.arg.{className}.{arg}]
+            mov [class.{className}.{lhs.children[1].value}], rax"""
+          else:
+            r=f"""
+            {E}
+            mov [class.{className}.{lhs.children[1].value}], rax
+            """
+        else:
+          # if rhs = arg of the constr
+          if c.children[1].data == "exp_var" and\
+                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+            arg = c.children[1].children[0].value
+            r = f"""mov rax, [class.arg.{className}.{arg}]
+            mov [{lhs.children[0].value}.{lhs.children[1].value}], rax"""
+          else:
+            r=f"""
+            {E}
+            mov [{lhs.children[0].value}.{lhs.children[1].value}], rax
+            """
+      elif lhs.data == "lhs_var":
+         # if rhs = arg of the constr
+          if c.children[1].data == "exp_var" and\
+                c.children[1].children[0].value in Class_list[f"{className}"]["arg"]:
+            arg = c.children[1].children[0].value
+            r = f"""mov rax, [class.arg.{className}.{arg}]
+            mov [{lhs.children[0].value}], rax"""
+          else:
+            r=f"""
+            {E}
+            mov [{lhs.children[0].value}], rax
+            """
+      return r
 
-def asm_bcom(bc):
-  return "\n" + "".join([asm_com(c) for c in bc.children])
+def asm_bcom(bc,className=None):
+  return "\n" + "".join([asm_com(c,className) for c in bc.children])
  
 def asm_prg(p):
   f = open("moule.asm")
   moule = f.read()
+  D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
+  moule = moule.replace("DECL_VARS", D)
   C = asm_bcom(p.children[2])
   moule = moule.replace("BODY", C)
   R = asm_exp(p.children[3])
   moule = moule.replace("RETURN", R)
-  D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
-  moule = moule.replace("DECL_VARS", D)
-  DC = f"{asm_class(p.children[1].children[1])}"
+  DC=""
+  for class_ in p.children[1].children:
+    DC += f"{asm_class(class_)}\n"
   moule = moule.replace("DECL_CLASS", DC)
   s = ""
   for i in range(len(p.children[0].children)):
@@ -246,7 +298,7 @@ def asm_prg(p):
 ####################################################################################################################
 def vars_lhs(lhs):
   if lhs.data == "lhs_id_attribute":
-    return f"{lhs.children[0].value}.{lhs.children[1].value}"
+    return set(f"{lhs.children[0].value}.{lhs.children[1].value}")
 
 def vars_exp(e):
   if e.data == "exp_nombre" :
@@ -268,18 +320,40 @@ def vars_com(c):
   if c.data == "assignation":
     R = vars_exp(c.children[1])
     return {c.children[0].value} | R
+  elif c.data == "lhs_assignation":
+    lhs = c.children[0]
+    if c.children[1].data == "exp_call_class_constructor":
+      if c.children[0].data == "lhs_var":
+        ObjectName = c.children[0].children[0].value
+        ConstrName = c.children[1].children[0].value
+        ObjAttributeSet = set()
+        for attribute in Class_list[f"{ConstrName}"]["attr"]:
+          ObjAttributeSet.add(f"{ObjectName}.{attribute}")
+        return ObjAttributeSet
+    else:
+      if c.children[0].data == "lhs_var":
+        R = vars_exp(c.children[1])
+        return {lhs.children[0].value} | R
+      if c.children[0].data == "lhs_id_attribute":
+        # soit self att
+        if lhs.children[0].value == "self":
+          return set() # handle in vars_class bcs need class name
+        # soit obj att 
+        else :
+          return set(f"{lhs.children[0].value}.{lhs.children[1].value}")
+  
   if c.data == "lhs_assignation":
     if c.children[0].data == "lhs_var":
       R = vars_exp(c.children[1])
-      return {c.children[0].value} | R
-    if c.children[0].data == "lhs_id_attribute_var":
-      lhs = c.children[0].children[0]
+      return {c.children[0].children[0].value} | R
+    if c.children[0].data == "lhs_id_attribute":
+      lhs = c.children[0]
       # soit self att
       if lhs.children[0].value == "self":
-        return set()
+        return set() # handle in vars_class bcs need class name
       # soit obj att 
       else :
-        return f"{lhs.children[0].value}.{lhs.children[1].value}"
+        return set(f"{lhs.children[0].value}.{lhs.children[1].value}")
   if c.data in {"if", "while"}:
     B = vars_bcom(c.children[1])
     E = vars_exp(c.children[0])
@@ -289,38 +363,46 @@ def vars_com(c):
 
 def vars_bcom(bc):
   S = set()
-  for c in bc.children:
+  for c in bc.children: 
     S = S | vars_com(c)
   return S
 
-Class_list = []
+Class_list = {}
 
 def vars_class(c):
-  if c.data == "no_class":
-    return set()
-  elif c.data == "create_class":
-    Class_list.append([c.children[0].value])
-    nb = len(Class_list)
-    Constructor = c.children[1]
-    Args = set([f"class.{c.children[0].value}.{t.value}" for t in Constructor.children[1].children])
-    C = vars_bcom(c.children[1].children[2])
-    ClassAtt = set()
-    ConstrBcom = Constructor.children[2]
-    for com in ConstrBcom.children:
-      if com.data == "lhs_assignation":
-        if com.children[0].data == "lhs_id_attribute":
-          lhs = com.children[0]
-          # soit self att
-          if lhs.children[0].value == "self":
-            Class_list[nb].append(lhs.children[1].value)
-            ClassAtt = ClassAtt | f"class.{c.children[0]}.{lhs.children[1].value}"
-    return Args | C | ClassAtt
+  Class_list[f"{c.children[0].value}"] = {"attr":[],"arg":[],"meth":[]}
+  Constructor = c.children[1]
+  Args = set([f"class.arg.{c.children[0].value}.{t.value}" for t in Constructor.children[1].children])
+  for t in Constructor.children[1].children:
+    Class_list[f"{c.children[0].value}"]["arg"].append(t.value)
+  C = vars_bcom(c.children[1].children[2])
+  ClassAtt = set()
+  ConstrBcom = Constructor.children[2]
+  for com in ConstrBcom.children:
+    if com.data == "lhs_assignation":
+      if com.children[0].data == "lhs_id_attribute":
+        lhs = com.children[0]
+        # if it is a self attribute (= in the constructor)
+        if lhs.children[0].value == "self":
+          Class_list[f"{c.children[0].value}"]["attr"].append(lhs.children[1].value)
+          ClassAtt.add(f"class.{c.children[0].value}.{lhs.children[1].value}")
+  print("Le set")
+  print(Args | C | ClassAtt)
+  print("fin set")
+  return Args | C | ClassAtt
 
 def vars_prg(p):
   L = set([t.value for t in p.children[0].children])
-  O = vars_class(p.children[0])
-  C = vars_bcom(p.children[1])
-  R = vars_exp(p.children[2])
+  if p.children[1].data == "at_least_class":
+     print("OK")
+     
+     O=set()
+     print(p.children[1].children)
+     for class_ in p.children[1].children:
+      vars_class(class_)
+      O = O | vars_class(class_)
+  C = vars_bcom(p.children[2])
+  R = vars_exp(p.children[3])
   return L | O | C | R
 
 ####################################################################################################################
@@ -331,28 +413,32 @@ if __name__ == '__main__':
   main(X,Y,Z) {
     class Car {
       def Car(speed) {
-        self.speed=3;
+        self.speed=speed+1;
       }
     }
-    speed = 5;
-    car = Car(speed);
-    
-    x = car.speed;
-    while(X){
-        T = 4;
-        X = X-1;
-        Y = Y+1;
+    class Human {
+      def Human(size) {
+        self.footSize = size-1;
+      }
     }
+    speed=28;
+    car = Car(speed);
+    s=1;
+    h=Human(s);
+    
+    Y = car.speed;
     return (Y);
   }
   """)
-  print(pp_prg(ast))
+  print(ast)
+  
+  #print(pp_prg(ast))
   asm = asm_prg(ast)
   f = open("tom.asm", "w")
   f.write(asm)
   f.close()
  
-
+  print(Class_list)  
 ####################################################################################################################
 ## NOTES                                                                                                      
 ####################################################################################################################
