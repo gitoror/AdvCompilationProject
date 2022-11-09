@@ -417,16 +417,18 @@ if __name__ == '__main__':
       }
     }
     class Human {
-      def Human(size) {
+      def Human(size,age) {
         self.footSize = size-1;
+        self.age=age;
       }
     }
     speed=28;
     car = Car(speed);
     s=1;
-    h=Human(s);
-    
-    Y = car.speed;
+    a=21;
+    h=Human(s,a);
+
+    Y = h.age;
     return (Y);
   }
   """)
