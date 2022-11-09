@@ -69,12 +69,13 @@ def asm_exp(e):
 
         return f"mov rax, str{list_str.index(e.children[0].value)} \0\n"
     elif e.data == "exp_fonc_length":
-        return f"mov rax, {len(e.children[0].value)}"
-        #return f"""
-        #mov rax, [{e.children[0].value}]\n
-        #mov rdi, rax
-        #call strlen
-        #"""                                                         # try to use strlen to find out length, segmentation fault
+        list_len.append(e.children[0].value)
+        #return f"mov rax, len{list_str.index(e.children[0].value)}"
+        return f"""
+        mov rax, {e.children[0].value}
+        mov rdi, rax
+        call strlen
+        """                                                         # try to use strlen to find out length, segmentation fault
     
 
 
@@ -217,7 +218,8 @@ def asm_prg(p):
     
     D = "\n".join([f"{v} : dq 0" for v in vars_prg(p)])
     D += "\n"+"\n".join([f"str{list_str.index(v)} : db \"{v}\", 0" for v in list_str]) # declaire adress for string
-    D += "\n"+"\n".join([f"len{list_len.index(v)} : equ $ -\"{v}\" " for v in list_len]) # declaire adress for length
+    D += "\n"+"\n".join([f"{v} : db \"{v}\", 0" for v in list_len])
+    #D += "\n"+"\n".join([f"len{list_len.index(v)} : equ $ -\"{v}\" " for v in list_len]) # declaire adress for length
     print(list_sum)
     D += "\n"+"\n".join([f"{v} : db \"{v}\", 0" for v in list_sum])
     moule = moule.replace("DECL_VARS", D)  # need to write DECL_VARS before asm_exp and asm_bcom to name var str
@@ -302,8 +304,8 @@ def pp_class(c):
 #print(pp_class(ast_class))
 #print(pp_constructor(ast_constructor))
 
-ast_string1=grammaire.parse(""" string main(x){
- x = "coucou"+"hello";
+ast_string1=grammaire.parse(""" int main(x){
+ x = len("coucou");
  
  return (x);}
  

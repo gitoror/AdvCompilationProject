@@ -1,4 +1,4 @@
-extern printf, atoi, strcat
+extern printf, atoi, strcat, strlen
 
 section .data
 FMT
