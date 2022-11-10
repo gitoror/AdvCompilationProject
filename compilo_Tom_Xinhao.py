@@ -15,6 +15,7 @@ exp : IDENTIFIER                           -> exp_var
 | IDENTIFIER "." IDENTIFIER                -> exp_id_attribute
 |   "\"" STRING "\""           -> exp_str
 | "len" "(" "\"" STRING "\"" ")"     -> exp_fonc_length
+| "len" "(" IDENTIFIER ")"     -> exp_fonc_length_var
 | STRING "+" STRING             -> exp_fonc_concatenation
 | IDENTIFIER "[" SIGNED_NUMBER "]" -> exp_fonc_getletter
 com : lhs "=" exp ";"                         -> lhs_assignation
@@ -133,7 +134,15 @@ def asm_exp(e, className=None):
       mov rsi, rdx
       mov rdi, rax
       call strcat
-      """                                                         
+      """ 
+    elif (e.children[0].data == "exp_var"):
+      return f"""
+      mov rdx, [{e.children[2].children[0].value}]
+      mov rax, [{e.children[0].children[0].value}] 
+      mov rsi, rdx
+      mov rdi, rax
+      call strcat
+      """                                                              
     else:
       E1 = asm_exp(e.children[0])
       E2 = asm_exp(e.children[2])
@@ -165,7 +174,13 @@ def asm_exp(e, className=None):
     mov rax, {e.children[0].value}
     mov rdi, rax
     call strlen
-    """                                                        
+    """
+  elif e.data == "exp_fonc_length_var":
+        return f"""
+        mov rax, [{e.children[0].value}]
+        mov rdi, rax
+        call strlen
+        """                                                                
                            
 
 cpt = 0
