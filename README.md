@@ -1,12 +1,8 @@
-# AdvCompilationProject
-
 COMPIL
 
 avoir fait les pretty printer
 
-exemple type qui rend compte de l’interet du compilo 
-doc qui decrit est la syntaxe du langage pour que le prof puisse ecrire des prog et essaie de compiler 
-dossier : compilo, readme, doc de syntaxe, transparents de la présentation
+exemple type qui rend compte de l’interet du compilo doc qui decrit est la syntaxe du langage pour que le prof puisse ecrire des prog et essaie de compiler dossier : compilo, readme, doc de syntaxe, transparents de la présentation
 
 Fonctionnement String:
 
@@ -14,41 +10,40 @@ remarque: lorsque l'on veut afficher un string, il faut remplacer "%d" par "%s" 
 
 1°) Pouvoir affichier un string sans ou avec espace:
 
-remarque: 
+remarque:
 
-bug: on ne peut pas afficher l'entrée (en string) de la fonction à cause de moule.asm (à résoudre)
-résolution : remplace ligne call atoi par mov rax, rdi 
+bug: on ne peut pas afficher l'entrée (en string) de la fonction à cause de moule.asm (à résoudre) résolution : remplace ligne call atoi par mov rax, rdi
 
-ex. 
+ex. ast_string1=grammaire.parse(""" string main(x){
+
+z = "coucou Abc.DEf?" ; return (z);}
+
+""")
+
+2°) Concaténation:
+
+ex.
+
 ast_string1=grammaire.parse(""" string main(x){
- 
- z = "coucou Abc.DEf?" ;
- return (z);}
- 
- """)
- 
- 
- 2°) Concaténation:
- 
- ex.
- 
- ast_string1=grammaire.parse(""" string main(x){
- 
- z = "coucou" + "a";
- return (z);}
- 
- """)
 
- 3°) Length:
+z = "coucou" + "a"; return (z);}
 
- ex.
+""")
 
- ast_string1=grammaire.parse(""" int main(x){
- 
- z = "coucou";
- i = len("coucoua");
- return (i);}
- 
- """)
- 
- 
+ast_string1=grammaire.parse(""" string main(x){ x = "coucou"; z = "hello"; y = x + z; return (y);}
+
+""")
+
+3°) Length:
+
+ex.
+
+ast_string1=grammaire.parse(""" int main(x){
+
+z = "coucou"; i = len("coucoua"); return (i);}
+
+ast_string1=grammaire.parse(""" int main(x){ x = "coucou"; y = len(x); return (y);}
+
+""")
+
+""")
