@@ -7,6 +7,7 @@ exp : SIGNED_NUMBER              -> exp_nombre
 | "(" exp ")"                    -> exp_par
 |   "\"" STRING "\""           -> exp_str
 | "len" "(" "\"" STRING "\"" ")"     -> exp_fonc_length
+| "len" "(" IDENTIFIER ")"     -> exp_fonc_length_var
 | STRING "+" STRING             -> exp_fonc_concatenation
 | IDENTIFIER "[" SIGNED_NUMBER "]" -> exp_fonc_getletter
 com : IDENTIFIER "=" exp ";"     -> assignation
@@ -50,11 +51,19 @@ def asm_exp(e):
             list_sum.append(e.children[2].children[0].value)
             return f"""
             mov rdx, {e.children[2].children[0].value}
-            mov rax, {e.children[0].children[0].value} 
+            mov rax, {e.children[0].children[0].value}
             mov rsi, rdx
             mov rdi, rax
             call strcat
             """                                                         # try to use strcat to concanate strings, segmentation fault
+        elif (e.children[0].data == "exp_var"):
+            return f"""
+            mov rdx, [{e.children[2].children[0].value}]
+            mov rax, [{e.children[0].children[0].value}] 
+            mov rsi, rdx
+            mov rdi, rax
+            call strcat
+            """            
         else:
             E1 = asm_exp(e.children[0])
             E2 = asm_exp(e.children[2])
@@ -76,7 +85,12 @@ def asm_exp(e):
         mov rdi, rax
         call strlen
         """                                                         # try to use strlen to find out length, segmentation fault
-    
+    elif e.data == "exp_fonc_length_var":
+        return f"""
+        mov rax, [{e.children[0].value}]
+        mov rdi, rax
+        call strlen
+        """            
 
 
 def pp_exp(e):
@@ -118,6 +132,8 @@ def vars_exp(e):
        return set()
     elif e.data == "exp_fonc_length":
         list_len.append(e.children[0].value)
+        return set()
+    elif e.data == "exp_fonc_length_var":
         return set()
     
 
@@ -304,10 +320,11 @@ def pp_class(c):
 #print(pp_class(ast_class))
 #print(pp_constructor(ast_constructor))
 
-ast_string1=grammaire.parse(""" int main(x){
- x = len("coucou");
- 
- return (x);}
+ast_string1=grammaire.parse(""" string main(x){
+ x = "coucou";
+ z = "hello";
+ y = x + z;
+ return (y);}
  
  """)
 asm_string1 = asm_prg(ast_string1)
