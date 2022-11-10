@@ -176,11 +176,11 @@ def asm_exp(e, className=None):
     call strlen
     """
   elif e.data == "exp_fonc_length_var":
-        return f"""
-        mov rax, [{e.children[0].value}]
-        mov rdi, rax
-        call strlen
-        """                                                                
+    return f"""
+    mov rax, [{e.children[0].value}]
+    mov rdi, rax
+    call strlen
+    """                                                                
                            
 
 cpt = 0
