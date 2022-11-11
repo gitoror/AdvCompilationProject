@@ -15,7 +15,7 @@ exp : IDENTIFIER                           -> exp_var
 | IDENTIFIER "." IDENTIFIER                -> exp_id_attribute
 | IDENTIFIER "." exp                       -> exp_id_follow_attr
 |   "\"" STRING "\""           -> exp_str
-| "len" "(" "\"" STRING "\"" ")"     -> exp_fonc_length
+| "len" "[" "\"" STRING "\"" "]"     -> exp_fonc_length
 | "len" "[" IDENTIFIER "]"     -> exp_fonc_length_var
 com : lhs "=" exp ";"                         -> lhs_assignation
 | "if" "(" exp ")" "{" bcom "}"               -> if
@@ -530,7 +530,7 @@ if __name__ == '__main__':
       a = "coucou";
       b = " hello";
       c = a+b;
-      d = len[c]; 
+      d = len["coucou"]; 
       return(d);
       }
       """)

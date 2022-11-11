@@ -3,10 +3,19 @@ COMPILO
 Général
 
 Seulement les int sont acceptés pour l'entrée du main
-remarque:
-si on veut les entrée soient de string, il faut remplace ligne call atoi par mov rax, rdi lorsqu'on traite les entrées(dans fonction asm_prog() de script .py, variable s)
 
-Partie Class (par Tom Marini):
+structure de main est sous la forme
+
+<int/string> main(<var_list>){
+  <classes> (initialisation des classes)
+  <bcom>
+  return <(exp)>
+}
+
+remarque:
+si on veut les entrées soient de string, il faut remplace ligne call atoi par mov rax, rdi lorsqu'on traite les entrées(dans fonction asm_prog() de script .py, variable s)
+
+Partie Class (Tom Marini):
 
 L'objectif de cette partie est d'apporter une extension au compilateur fait en cours. Cette extension est l'implémentation des objets. Cependant elle ne fonctionne pas encore. Il y a toutes les fonctions permettant d'écrire le programme.asm pour les classes, mais les erreurs sont dues à une mauvaise manipulation de l'ast. J'ai des erreurs du type : 'Token' object has no attribute 'data'. En observant l'ast je me rend bien comtpe du problème. Un moyen pour le résoudre serait de modifier la grammaire pour que l'ast soit comme je le souhaite, mais je n'y arrive pas.
 
@@ -36,6 +45,20 @@ print(v)
 
 
 Partie String (Xinhao ZHAO):
+Objectif de cette partie est d'apporter une extension au compilateur fait en cours, qui est expression string. Cette partie permet de réaliser 
+1°) printer un string
+2°) concaténation (soit directement entre les chaînes, ex. "coucou"+"hello", soit entre les variables)
+3°) trouver la taille d'une chaîne de caractère (soit avec une chaine, ex len["coucou"], soit avec une variable)
+
+Un inconvénient dans le code est d'utiliser 3 listes pour gérer les données string: 
+1°)je stock les chaînes dans list_str (une liste python) lors d'affectation (ex. x = "coucou", et je stock "coucou" dans list_str pour ensuite construire une adresse pour "coucou" dans .asm).
+2°)je stock les chaînes dans list_sum (une liste python) lors de concaténation entre deux string (ex. z = "coucou" + "hello", et je stock "coucou" et "hello" dans list_sum pour ensuite construire des adresses dans .asm).
+3°)je stock les chaînes dans list_len (une liste python) lorsqu'on veut la taille d'une chaîne (ex. z = len["coucou"], et je stock "coucou" dans list_str pour ensuite construire une adresse).
+Ce sera pas mal si l'on peut stocker les chaînes dans une liste, mais je n'ai pas de temps. En plus si on fait (x = "coucou", y = len["coucou"], ça va générer deux adresses "coucou" et ça fonctionne dans .asm). 
+
+Pour éviter le conflit entre class et length, je décide de changer syntaxe length comme (len["coucou"], et len[x]).
+
+
 Fonctionnement et syntaxe (avec exemple d'utilisation)
 
 1°) Pouvoir affichier un string sans ou avec espace:
@@ -74,7 +97,7 @@ return (y);}
 ex.1
 
 int main(x){
-i = len("coucoua"); 
+i = len["coucoua"]; 
 return (i);}
 
 ex2.
