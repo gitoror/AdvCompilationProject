@@ -7,8 +7,8 @@ Seulement les int sont acceptés pour l'entrée du main
 structure de main est sous la forme
 
 <int/string> main(<var_list>){
-  <classes> (initialisation des classes)
-  <bcom>
+  classes (initialisation des classes)
+  bcom
   return <(exp)>
 }
 
