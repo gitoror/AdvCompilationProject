@@ -81,7 +81,7 @@ ex2.
 
 int main(x){ 
 x = "coucou"; 
-y = len(x); 
+y = len[x]; 
 return (y);}
 
 "
