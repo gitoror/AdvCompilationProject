@@ -67,7 +67,7 @@ def pp_exp(e):
   elif e.data == "exp_str":
         return f"{e.children[0].value}"
   elif e.data == "exp_fonc_length":
-        return f"len({e.children[0].value})"
+        return f"len[{e.children[0].value}]"
   
 def pp_class(c):
   if c.data == "no_class":
