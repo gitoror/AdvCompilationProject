@@ -1,9 +1,22 @@
-# AdvCompilationProject
+# Projet compilation
 
-COMPIL
+## Tom : extension objets
+Mon compilateur fonctionne de la manière suivante pour la programmation d'objets proches de python : 
 
-avoir fait les pretty printer
-
-exemple type qui rend compte de l’interet du compilo 
-doc qui decrit est la syntaxe du langage pour que le prof puisse ecrire des prog et essaie de compiler 
-dossier : compilo, readme, doc de syntaxe, transparents de la présentation
+'
+main(X,Y,Z) {
+      class Car {
+        def Car(speed) {
+          self.speed=speed+1;
+        }
+        method accelerate() {
+          self.speed = self.speed + 50;
+        }
+      }
+        
+      speed=28;
+      car = Car(speed);
+      car.accelerate() Car;
+      Y = car.speed;
+      return (Y);
+'
