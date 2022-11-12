@@ -590,10 +590,15 @@ if __name__ == '__main__':
         method accelerate() {
           self.speed = self.speed + 50;
         }
+        method brake() {
+          self.speed = 0;
+        }
       }
         
       speed=28;
       car = Car(speed);
+      
+      car.brake() Car;
       car.accelerate() Car;
       Y = car.speed;
       return (Y);
