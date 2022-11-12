@@ -36,7 +36,7 @@ nasm -f elf64 tom.asm
 gcc -np-pie -fno-pie tom.o
 ./a.out
 ```
-Autre exemple :
+Autre exemple fonctionnel à l'écexution :
 - Affectation d'un objet à l'attribut d'une classe. Attention, il faut déclarer les classes dans le bon ordre.
 - Arguments pouvant être des objets dans le constructeur.
 - Affectation de l'attribut d'un attribut.
