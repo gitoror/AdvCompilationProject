@@ -77,3 +77,7 @@ Je suis définitivement limité par le fait que dans ma conception un objet n'ex
 Si on a analyse le résulat produit par le compilo en assembleur, on voit que la déclaration des variables n'est pas parfaite (lettres qui trainent, variables inutiles). Sinon le reste est cohérent.
 
 ## Tom : fin
+
+# Xinhao : extension string
+
+# Mohamed Amine : extension typage dynamique
