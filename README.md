@@ -65,7 +65,7 @@ main(X,Y,Z) {
 ```
 
 ## Travail d'équipe 
-Les objets sont censés fonctionner avec les strings, extension du compilo réalisée par Xinhao. Une tentative a été effectuée mais elle ne permet pas du tout d'exploiter les objets. 
+Les objets sont censés fonctionner avec les strings, extension du compilo réalisée par Xinhao. Une tentative a été effectuée mais elle ne permet pas du tout d'exploiter les objets, voir `compiloTom_Xinhao.py`.
 
 ## Organisation du code
 Il y a beaucoup de lignes car je n'ai pas eu le temps d'optimiser mon code ... 
