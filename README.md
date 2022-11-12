@@ -1,6 +1,6 @@
 # Projet compilation
 
-## Tom : extension objets
+# Tom : extension objets
 Voici un exemples de fonctionnement du compilo pour la programmation d'objets proches de python : 
 
 - Définir une classe toujours avant le bloc de commandes du main. 
@@ -76,3 +76,4 @@ Je suis définitivement limité par le fait que dans ma conception un objet n'ex
 ## Résultat assembleur
 Si on a analyse le résulat produit par le compilo en assembleur, on voit que la déclaration des variables n'est pas parfaite (lettres qui trainent, variables inutiles). Sinon le reste est cohérent.
 
+## Tom : fin
